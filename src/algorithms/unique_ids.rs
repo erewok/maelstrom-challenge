@@ -31,11 +31,13 @@ pub struct UniqueIdGenerator {
 }
 
 fn node_string_id_to_u64(node_id: &str) -> u64 {
-    let mut buffer = [0u8; 8];
-    for (&x, p) in node_id.as_bytes().iter().zip(buffer.iter_mut()) {
-        *p = x;
+    // node_ids are strings like "n2". We want to turn this into an int.
+    let node_id_int: String = node_id.chars().filter(|c| c.is_digit(10)).collect();
+    if node_id_int.is_empty() {
+        0
+    } else {
+        node_id_int.parse().unwrap_or(0)
     }
-    u64::from_be_bytes(buffer)
 }
 
 
