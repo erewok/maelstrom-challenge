@@ -9,5 +9,5 @@ pub enum Workload {
     PNCounter,     // eventually consistent counter with inc and dec
     TxnListAppend, // transactional workload over a map of keys to lists of elements
     TxnRwRegister, // transactional workload over a map of keys to values.
-    UniqueIDs,     // simple workload for ID generation systems
+    UniqueIds,     // simple workload for ID generation systems
 }

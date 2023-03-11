@@ -11,7 +11,7 @@ use crate::errors;
 /// These strings alone don't give much information
 /// because they're often repeated for different workloads
 /// see: https://github.com/jepsen-io/maelstrom/blob/main/doc/workloads.md
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Debug)]
 #[serde(rename_all = "snake_case")]
 pub enum MessageType {
     Init,
@@ -39,7 +39,7 @@ pub trait IntoReplyBody {
 
 ///
 
-#[derive(Deserialize)]
+#[derive(Deserialize, Debug)]
 pub struct InitMsgIn {
     pub src: String,
     pub dest: String,
@@ -61,34 +61,34 @@ impl InitMsgIn {
     ) -> Result<String, errors::ErrorMsg> {
         let msg_out = serde_json::from_str::<Self>(msg)
             .map(|m| m.into_response(outbound_msg_id))
-            .map_err(|e| errors::ErrorMsg::json_parse_error())?;
-        serde_json::to_string(&msg_out).map_err(|e| errors::ErrorMsg::json_dumps_error())
+            .map_err(|_e| errors::ErrorMsg::json_parse_error())?;
+        serde_json::to_string(&msg_out).map_err(|_e| errors::ErrorMsg::json_dumps_error())
     }
 }
 
-#[derive(Serialize)]
+#[derive(Serialize, Debug)]
 pub struct InitMsgOut {
     pub src: String,
     pub dest: String,
     pub body: InitResponseMsg,
 }
 
-#[derive(Deserialize)]
+#[derive(Deserialize, Debug)]
 struct Init(MessageType);
 
-#[derive(Serialize)]
+#[derive(Serialize, Debug)]
 #[serde(rename_all = "snake_case")]
 enum InitMessageResp {
     InitOk,
 }
 
-#[derive(Serialize)]
+#[derive(Serialize, Debug)]
 struct InitOk(InitMessageResp);
 
-#[derive(Deserialize)]
+#[derive(Deserialize, Debug)]
 pub struct InitRequestMsg {
     #[serde(rename = "type")]
-    typ: Init,
+    _typ: Init,
     pub msg_id: u64,
     pub node_id: String,
     pub node_ids: Vec<String>,
@@ -97,7 +97,7 @@ pub struct InitRequestMsg {
 impl InitRequestMsg {
     pub fn new(msg_id: u64, node_id: String, node_ids: Vec<String>) -> Self {
         InitRequestMsg {
-            typ: Init(MessageType::Init),
+            _typ: Init(MessageType::Init),
             msg_id,
             node_id,
             node_ids,
@@ -114,7 +114,7 @@ impl IntoReplyBody for InitRequestMsg {
     }
 }
 
-#[derive(Serialize)]
+#[derive(Serialize, Debug)]
 pub struct InitResponseMsg {
     #[serde(rename = "type")]
     typ: InitOk,

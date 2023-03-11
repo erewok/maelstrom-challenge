@@ -1,6 +1,6 @@
 # Maelstrom Challenge
 
-This repo is an attempt to solve all of the challenges from [Fly.io's Gossip Glimmers](https://fly.io/dist-sys/), described as "A series of distributed systems challenges".
+This repo is an attempt to solve all of the challenges from [Fly.io's Gossip Glimmers](https://fly.io/dist-sys/), described as "A series of distributed systems challenges". See also, the [maelstrom repo](https://github.com/jepsen-io/maelstrom/tree/main).
 
 ## To Build
 
@@ -12,9 +12,16 @@ Run a Maelstrom Challenge from Fly.io
 Usage: maelstrom-challenge --workload <WORKLOAD>
 
 Options:
-  -w, --workload <WORKLOAD>  Name of the workload (challenge) to run [possible values: broadcast, echo, g-counter, g-set, kafka, lin-kv, pn-counter, txn-list-append, txn-rw-register, unique-i-ds]
+  -w, --workload <WORKLOAD>  Name of the workload (challenge) to run [possible values: broadcast, echo, g-counter, g-set, kafka, lin-kv, pn-counter, txn-list-append, txn-rw-register, unique-ids]
   -h, --help                 Print help
   -V, --version              Print version
+```
+
+We have typically set this via environment variable:
+
+```sh
+$ export WORKLOAD=echo
+
 ```
 
 ## To Run a Maelstrom Challenge

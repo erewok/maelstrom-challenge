@@ -41,8 +41,8 @@ impl EchoMsgIn {
     pub fn parse_msg_to_str_response(msg: &str, outbound_msg_id: u64) -> Result<String, errors::ErrorMsg> {
         let msg_out = serde_json::from_str::<Self>(msg)
             .map(|m| m.into_response(outbound_msg_id))
-            .map_err(|e| errors::ErrorMsg::json_parse_error())?;
-        serde_json::to_string(&msg_out).map_err(|e| errors::ErrorMsg::json_dumps_error())
+            .map_err(|_e| errors::ErrorMsg::json_parse_error())?;
+        serde_json::to_string(&msg_out).map_err(|_e| errors::ErrorMsg::json_dumps_error())
     }
 }
 
@@ -57,7 +57,7 @@ pub struct EchoMsgOut {
 #[derive(Deserialize)]
 pub struct EchoRequestMsg {
     #[serde(rename = "type")]
-    typ: Echo,
+    _typ: Echo,
     pub msg_id: u64,
     pub echo: Value
 }
@@ -65,7 +65,7 @@ pub struct EchoRequestMsg {
 impl EchoRequestMsg {
     pub fn new(msg_id: u64, echo: Value) -> Self {
         EchoRequestMsg {
-            typ: Echo(MessageType::Echo),
+            _typ: Echo(MessageType::Echo),
             msg_id,
             echo
         }

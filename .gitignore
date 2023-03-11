@@ -1,3 +1,4 @@
 /target
 store/
 runner.sh
+.envrc

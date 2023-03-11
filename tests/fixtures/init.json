@@ -1,0 +1,10 @@
+{
+    "src": "c1", 
+    "dest": "n2", 
+    "body": {
+        "type":     "init",
+        "msg_id":   1,
+        "node_id":  "n2",
+        "node_ids": ["n1", "n2", "n3"]
+    }
+}

@@ -3,7 +3,7 @@ use serde::{Deserialize, Serialize};
 use crate::errors;
 use crate::rpc::{self, IntoReplyBody, MessageType};
 
-#[derive(Deserialize)]
+#[derive(Deserialize, Debug)]
 pub struct GenerateMsgIn {
     pub src: String,
     pub dest: String,
@@ -26,20 +26,26 @@ impl GenerateMsgIn {
     ) -> Result<String, errors::ErrorMsg> {
         let msg_out = serde_json::from_str::<Self>(msg)
             .map(|m| m.into_response(outbound_msg_id))
-            .map(|mut msg_out| msg_out.body.value = value)
-            .map_err(|e| errors::ErrorMsg::json_parse_error())?;
-        serde_json::to_string(&msg_out).map_err(|e| errors::ErrorMsg::json_dumps_error())
+            .map(|mut msg_out| {
+                msg_out.body.value = value;
+                msg_out
+            })
+            .map_err(|_e| {
+                eprintln!("Failing to parse {:?}", _e);
+                errors::ErrorMsg::json_parse_error()
+            })?;
+        serde_json::to_string(&msg_out).map_err(|_e| errors::ErrorMsg::json_dumps_error())
     }
 }
 
-#[derive(Serialize)]
+#[derive(Serialize, Debug)]
 pub struct GenerateMsgOut {
     pub src: String,
     pub dest: String,
     pub body: GenerateResponseMsg,
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Debug)]
 #[serde(rename_all = "snake_case")]
 pub enum GenerateMsgType {
     GenerateOk,
@@ -47,23 +53,23 @@ pub enum GenerateMsgType {
 
 /// The only allowed values for our messages below
 /// are in these newtypes. These are not-public.
-#[derive(Deserialize)]
+#[derive(Deserialize, Debug)]
 struct Generate(MessageType);
 
-#[derive(Serialize)]
+#[derive(Serialize, Debug)]
 struct GenerateOk(GenerateMsgType);
 
-#[derive(Deserialize)]
+#[derive(Deserialize, Debug)]
 pub struct GenerateRequestMsg {
     #[serde(rename = "type")]
-    typ: Generate,
+    _typ: Generate,
     pub msg_id: u64,
 }
 
 impl GenerateRequestMsg {
     pub fn new(msg_id: u64) -> Self {
         GenerateRequestMsg {
-            typ: Generate(MessageType::Generate),
+            _typ: Generate(MessageType::Generate),
             msg_id,
         }
     }
@@ -81,13 +87,13 @@ impl rpc::IntoReplyBody for GenerateRequestMsg {
     }
 }
 
-#[derive(Serialize)]
+#[derive(Serialize, Debug)]
 pub struct GenerateResponseMsg {
     #[serde(rename = "type")]
     typ: GenerateOk,
     in_reply_to: Option<u64>,
     msg_id: u64,
     #[serde(rename = "id")]
-    value: String,
+    pub value: String,
 }
 impl rpc::Reply for GenerateResponseMsg {}
