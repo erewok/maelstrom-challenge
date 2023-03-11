@@ -18,46 +18,46 @@ pub enum MsgType {
 pub struct TopologyRequestMsg {
     #[serde(rename = "type")]
     typ: MsgType,
-    msg_id: usize,
-    topology: HashMap<String, String>
+    msg_id: u64,
+    topology: HashMap<String, String>,
 }
 
 #[derive(Serialize, Deserialize)]
 pub struct TopologyResponseMsg {
     #[serde(rename = "type")]
     typ: String,
-    in_reply_to: Option<usize>,
-    msg_id: Option<String>
+    in_reply_to: Option<u64>,
+    msg_id: Option<String>,
 }
 
 #[derive(Serialize, Deserialize)]
 pub struct BroadcastMsg {
     #[serde(rename = "type")]
     typ: MsgType,
-    msg_id: usize,
-    message: Value
+    msg_id: u64,
+    message: Value,
 }
 
 #[derive(Serialize, Deserialize)]
 pub struct BroadcastResponseMsg {
     #[serde(rename = "type")]
     typ: String,
-    in_reply_to: Option<usize>,
-    msg_id: Option<String>
+    in_reply_to: Option<u64>,
+    msg_id: Option<String>,
 }
 
 #[derive(Serialize, Deserialize)]
 pub struct ReadAllMsg {
     #[serde(rename = "type")]
     typ: MsgType,
-    msg_id: usize,
+    msg_id: u64,
 }
 
 #[derive(Serialize, Deserialize)]
 pub struct ReadAllResponseMsg {
     #[serde(rename = "type")]
     typ: String,
-    in_reply_to: Option<usize>,
+    in_reply_to: Option<u64>,
     msg_id: Option<String>,
-    messages: Vec<Value>
+    messages: Vec<Value>,
 }

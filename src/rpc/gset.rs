@@ -1,7 +1,6 @@
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
-
 #[derive(Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum MsgType {
@@ -15,7 +14,7 @@ pub enum MsgType {
 pub struct AddRequestMsg {
     #[serde(rename = "type")]
     typ: MsgType,
-    msg_id: usize,
+    msg_id: u64,
     element: Value,
 }
 
@@ -23,22 +22,22 @@ pub struct AddRequestMsg {
 pub struct AddResponseMsg {
     #[serde(rename = "type")]
     typ: MsgType,
-    in_reply_to: Option<usize>,
-    msg_id: Option<String>
+    in_reply_to: Option<u64>,
+    msg_id: Option<String>,
 }
 
 #[derive(Serialize, Deserialize)]
 pub struct ReadMsg {
     #[serde(rename = "type")]
     typ: MsgType,
-    msg_id: usize,
+    msg_id: u64,
 }
 
 #[derive(Serialize, Deserialize)]
 pub struct ReadResponseMsg {
     #[serde(rename = "type")]
     typ: MsgType,
-    in_reply_to: Option<usize>,
+    in_reply_to: Option<u64>,
     msg_id: Option<String>,
-    value: Vec<Value>
+    value: Vec<Value>,
 }

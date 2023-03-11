@@ -7,7 +7,7 @@ use crate::workload;
 pub struct Node {
     pub node_id: String,
     pub node_ids: Vec<String>,
-    pub next_msg_id: usize,
+    pub next_msg_id: u64,
     workload: workload::Workload,
 }
 
@@ -30,10 +30,11 @@ impl Node {
     pub fn handle(&mut self, msg: &str) -> Result<String, errors::ErrorMsg> {
         self.next_msg_id += 1;
         match self.workload {
-            workload::Workload::Broadcast => todo!(),
             workload::Workload::Echo => {
                 echo::EchoMsgIn::parse_msg_to_str_response(msg, self.next_msg_id)
             }
+            workload::Workload::UniqueIDs => todo!(),
+            workload::Workload::Broadcast => todo!(),
             workload::Workload::GCounter => todo!(),
             workload::Workload::GSet => todo!(),
             workload::Workload::Kafka => todo!(),
@@ -41,7 +42,6 @@ impl Node {
             workload::Workload::PNCounter => todo!(),
             workload::Workload::TxnListAppend => todo!(),
             workload::Workload::TxnRwRegister => todo!(),
-            workload::Workload::UniqueIDs => todo!(),
         }
     }
 
@@ -59,10 +59,9 @@ impl Node {
             let result: String;
 
             if !initialized {
-                let init_first = serde_json::from_str::<rpc::InitMsgIn>(&line)
-                    .map_err(|_e| {
-                        eprintln!("{:?}", _e);
-                        errors::ErrorMsg::json_parse_error()
+                let init_first = serde_json::from_str::<rpc::InitMsgIn>(&line).map_err(|_e| {
+                    eprintln!("{:?}", _e);
+                    errors::ErrorMsg::json_parse_error()
                 })?;
                 result = node.on_init(init_first)?;
                 initialized = true;

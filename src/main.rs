@@ -7,12 +7,11 @@ use maelstrom_challenge::workload;
 #[derive(Parser, Debug)]
 #[command(author, version, about, long_about = None)]
 struct Args {
-   /// Name of the workload (challenge) to run
-   #[arg(short, long)]
-   #[arg(value_enum)]
-   workload: workload::Workload,
+    /// Name of the workload (challenge) to run
+    #[arg(short, long)]
+    #[arg(value_enum)]
+    workload: workload::Workload,
 }
-
 
 #[tokio::main]
 async fn main() {

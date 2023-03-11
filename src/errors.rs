@@ -29,13 +29,13 @@ struct ErrorM(ErrorMessageType);
 pub struct ErrorMsg {
     #[serde(rename = "type")]
     typ: ErrorM,
-    pub in_reply_to: Option<usize>,
+    pub in_reply_to: Option<u64>,
     pub code: ErrorType,
     pub text: String,
 }
 
 impl ErrorMsg {
-    pub fn new(in_reply_to: Option<usize>, code: ErrorType, text: String) -> Self {
+    pub fn new(in_reply_to: Option<u64>, code: ErrorType, text: String) -> Self {
         ErrorMsg {
             typ: ErrorM(ErrorMessageType::Error),
             in_reply_to,
@@ -61,10 +61,6 @@ impl ErrorMsg {
     }
 
     pub fn crash_error() -> Self {
-        ErrorMsg::new(
-            None,
-            ErrorType::Crash,
-            "Unrecoverable error".to_string(),
-        )
+        ErrorMsg::new(None, ErrorType::Crash, "Unrecoverable error".to_string())
     }
 }
