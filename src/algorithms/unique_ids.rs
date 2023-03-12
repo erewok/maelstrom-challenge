@@ -6,33 +6,10 @@ use crate::errors;
 use crate::node::NodeHandler;
 use crate::rpc::{self, unique_ids};
 
-/// This is inspired by twitter snowflake
-///
-/// Start our epoch on this date
-/// id = 1387263000 <<(64-41)
-///
-/// Let’s say we’re sharding by user ID,
-/// and there are 2000 logical shards;
-/// if our user ID is 31341, then the shard ID is 31341 % 2000 -> 1341
-/// We fill the next 13 bits with this value:
-/// id |= 1341 <<(64-41-13)
-///
-/// Remaining bits are the counter
-/// id |= (5001 % 1024)
-///
-///
-///
-/// 
-
-
-pub struct UniqueIdGenerator {
-    counter: u64,
-    pub node_id: u64,
-}
-
+/// We're going to use the integer identifier for this node as part of our unique id
 fn node_string_id_to_u64(node_id: &str) -> u64 {
     // node_ids are strings like "n2". We want to turn this into an int.
-    let node_id_int: String = node_id.chars().filter(|c| c.is_digit(10)).collect();
+    let node_id_int: String = node_id.chars().filter(|c| c.is_ascii_digit()).collect();
     if node_id_int.is_empty() {
         0
     } else {
@@ -40,16 +17,32 @@ fn node_string_id_to_u64(node_id: &str) -> u64 {
     }
 }
 
+/// This is inspired by twitter snowflake
+pub struct UniqueIdGenerator {
+    counter: u64,
+    pub node_id: u64,
+}
+
+impl Default for UniqueIdGenerator {
+    fn default() -> Self {
+        Self::new()
+    }
+}
 
 impl UniqueIdGenerator {
     pub fn new() -> Self {
-        Self { counter: 0, node_id: 0 }
+        Self {
+            counter: 0,
+            node_id: 0,
+        }
     }
 
     pub fn generate(&mut self) -> Result<u64, errors::ErrorMsg> {
         self.counter += 1;
         let epoch_millis = get_milliseconds();
-        let epoch = epoch_millis.parse::<u64>().map_err(|_e| errors::ErrorMsg::crash_error())?;
+        let epoch = epoch_millis
+            .parse::<u64>()
+            .map_err(|_e| errors::ErrorMsg::crash_error())?;
         let mut result = epoch << 23;
         result += self.node_id << 10;
         result += self.counter % 1024;
@@ -59,10 +52,13 @@ impl UniqueIdGenerator {
 
 #[async_trait]
 impl NodeHandler for UniqueIdGenerator {
-
     async fn handle(&mut self, msg: &str, next_msg_id: u64) -> Result<String, errors::ErrorMsg> {
         let generated_id = self.generate()?;
-        unique_ids::GenerateMsgIn::parse_msg_to_str_response(msg, generated_id.to_string(), next_msg_id)
+        unique_ids::GenerateMsgIn::parse_msg_to_str_response(
+            msg,
+            generated_id.to_string(),
+            next_msg_id,
+        )
     }
     async fn on_init(&mut self, msg: &rpc::InitMsgIn) -> Result<(), errors::ErrorMsg> {
         self.node_id = node_string_id_to_u64(msg.body.node_id.as_str());
@@ -81,7 +77,6 @@ pub fn get_milliseconds() -> String {
     let (head, _) = epoch_milli_string.split_at(10);
     head.to_owned()
 }
-
 
 #[cfg(test)]
 mod tests {
@@ -103,5 +98,4 @@ mod tests {
         assert!(one < two);
         assert!(two < three);
     }
-
 }

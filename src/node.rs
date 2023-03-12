@@ -6,19 +6,17 @@ use crate::errors;
 use crate::rpc;
 use crate::workload;
 
-
 #[async_trait]
 pub trait NodeHandler {
     async fn handle(&mut self, msg: &str, next_msg_id: u64) -> Result<String, errors::ErrorMsg>;
     async fn on_init(&mut self, msg: &rpc::InitMsgIn) -> Result<(), errors::ErrorMsg>;
 }
 
-
 pub struct Node {
     pub node_id: String,
     pub node_ids: Vec<String>,
     pub next_msg_id: u64,
-    handler: Box<dyn NodeHandler>
+    handler: Box<dyn NodeHandler>,
 }
 
 impl Node {
@@ -32,9 +30,9 @@ impl Node {
     }
     pub async fn on_init(&mut self, msg: rpc::InitMsgIn) -> Result<String, errors::ErrorMsg> {
         self.handler.on_init(&msg).await?;
+        self.node_id = msg.body.node_id.clone();
+        self.node_ids = msg.body.node_ids.clone();
         let msg_out = msg.into_response(self.next_msg_id);
-        self.node_id = msg.body.node_id;
-        self.node_ids = msg.body.node_ids;
         serde_json::to_string(&msg_out).map_err(|_e| errors::ErrorMsg::json_dumps_error())
     }
 
@@ -47,10 +45,17 @@ impl Node {
         let stdin = io::stdin();
         let mut lines = BufReader::new(stdin).lines();
 
-        let mut node  = match workload {
-            workload::Workload::Echo => Node::new(Box::new(algorithms::echo::EchoNode {}) as Box<dyn NodeHandler>),
-            workload::Workload::UniqueIds =>  Node::new(Box::new(algorithms::unique_ids::UniqueIdGenerator::new()) as Box<dyn NodeHandler>),
-            workload::Workload::Broadcast => Node::new(Box::new(algorithms::broadcast::Broadcast::new()) as Box<dyn NodeHandler>),
+        let mut node = match workload {
+            workload::Workload::Echo => {
+                Node::new(Box::new(algorithms::echo::EchoNode {}) as Box<dyn NodeHandler>)
+            }
+            workload::Workload::UniqueIds => {
+                Node::new(Box::new(algorithms::unique_ids::UniqueIdGenerator::new())
+                    as Box<dyn NodeHandler>)
+            }
+            workload::Workload::Broadcast => {
+                Node::new(Box::new(algorithms::broadcast::Broadcast::new()) as Box<dyn NodeHandler>)
+            }
             workload::Workload::GCounter => todo!(),
             workload::Workload::GSet => todo!(),
             workload::Workload::Kafka => todo!(),

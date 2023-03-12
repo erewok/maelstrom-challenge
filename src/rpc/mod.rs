@@ -34,7 +34,7 @@ pub enum MessageType {
 pub trait Reply {}
 pub trait IntoReplyBody {
     type Item: Reply;
-    fn into_reply(&self, outbound_msg_id: u64) -> Self::Item;
+    fn into_reply(self, outbound_msg_id: u64) -> Self::Item;
 }
 
 ///
@@ -47,7 +47,7 @@ pub struct InitMsgIn {
 }
 
 impl InitMsgIn {
-    pub fn into_response(&self, outbound_msg_id: u64) -> InitMsgOut {
+    pub fn into_response(self, outbound_msg_id: u64) -> InitMsgOut {
         InitMsgOut {
             src: self.dest.clone(),
             dest: self.src.clone(),
@@ -106,7 +106,7 @@ impl InitRequestMsg {
 }
 impl IntoReplyBody for InitRequestMsg {
     type Item = InitResponseMsg;
-    fn into_reply(&self, _: u64) -> InitResponseMsg {
+    fn into_reply(self, _: u64) -> InitResponseMsg {
         InitResponseMsg {
             typ: InitOk(InitMessageResp::InitOk),
             in_reply_to: Some(self.msg_id),

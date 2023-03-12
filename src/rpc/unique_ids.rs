@@ -11,7 +11,7 @@ pub struct GenerateMsgIn {
 }
 
 impl GenerateMsgIn {
-    pub fn into_response(&self, outbound_msg_id: u64) -> GenerateMsgOut {
+    pub fn into_response(self, outbound_msg_id: u64) -> GenerateMsgOut {
         GenerateMsgOut {
             src: self.dest.clone(),
             dest: self.src.clone(),
@@ -77,7 +77,7 @@ impl GenerateRequestMsg {
 
 impl rpc::IntoReplyBody for GenerateRequestMsg {
     type Item = GenerateResponseMsg;
-    fn into_reply(&self, outbound_msg_id: u64) -> GenerateResponseMsg {
+    fn into_reply(self, outbound_msg_id: u64) -> GenerateResponseMsg {
         GenerateResponseMsg {
             typ: GenerateOk(GenerateMsgType::GenerateOk),
             msg_id: outbound_msg_id,

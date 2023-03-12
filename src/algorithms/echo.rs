@@ -8,7 +8,6 @@ pub struct EchoNode {}
 
 #[async_trait]
 impl NodeHandler for EchoNode {
-
     async fn handle(&mut self, msg: &str, next_msg_id: u64) -> Result<String, errors::ErrorMsg> {
         echo::EchoMsgIn::parse_msg_to_str_response(msg, next_msg_id)
     }
