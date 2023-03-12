@@ -1,0 +1,7 @@
+{
+  "src": "c1",
+  "dest": "n2",
+  "body": {
+    "type": "read"
+  }
+}

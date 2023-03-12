@@ -50,7 +50,7 @@ impl Node {
         let mut node  = match workload {
             workload::Workload::Echo => Node::new(Box::new(algorithms::echo::EchoNode {}) as Box<dyn NodeHandler>),
             workload::Workload::UniqueIds =>  Node::new(Box::new(algorithms::unique_ids::UniqueIdGenerator::new()) as Box<dyn NodeHandler>),
-            workload::Workload::Broadcast => todo!(),
+            workload::Workload::Broadcast => Node::new(Box::new(algorithms::broadcast::Broadcast::new()) as Box<dyn NodeHandler>),
             workload::Workload::GCounter => todo!(),
             workload::Workload::GSet => todo!(),
             workload::Workload::Kafka => todo!(),

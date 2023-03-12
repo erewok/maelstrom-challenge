@@ -1,10 +1,10 @@
+use std::collections::HashMap;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
 use crate::errors;
 use crate::rpc::{self, IntoReplyBody, MessageType};
 
-use std::collections::HashMap;
 
 
 #[derive(Deserialize, Debug)]
@@ -31,20 +31,15 @@ impl BroadcastMsgIn {
         }
     }
 
-    pub fn parse_msg_to_str_response(
-        msg: &str,
-        value: String,
+    pub fn into_str_response(
+        &self,
+        value: &mut Option<Vec<Value>>,
         outbound_msg_id: u64,
     ) -> Result<String, errors::ErrorMsg> {
-        let msg_out = serde_json::from_str::<Self>(msg)
-            .map(|m| m.into_response(outbound_msg_id))
-            .map(|mut msg_out| {
-                msg_out
-            })
-            .map_err(|_e| {
-                eprintln!("Failing to parse {:?}", _e);
-                errors::ErrorMsg::json_parse_error()
-            })?;
+        let mut msg_out = self.into_response(outbound_msg_id);
+        if value.is_some() {
+            msg_out.body.set_value(value.take());
+        }
         serde_json::to_string(&msg_out).map_err(|_e| errors::ErrorMsg::json_dumps_error())
     }
 }
@@ -53,8 +48,9 @@ impl BroadcastMsgIn {
 
 #[derive(Deserialize, Debug)]
 #[serde(tag = "type")]
+#[serde(rename_all = "snake_case")]
 pub enum BroadcastMsgRequestBody {
-    Toplogy(TopologyRequestMsg),
+    Topology(TopologyRequestMsg),
     Broadcast(BroadcastRequestMsg),
     Read(ReadRequestMsg)
 }
@@ -63,16 +59,32 @@ impl rpc::IntoReplyBody for BroadcastMsgRequestBody {
     type Item = BroadcastMsgResponseBody;
 
     fn into_reply(&self, outbound_msg_id: u64) -> Self::Item {
-        todo!()
+        match self {
+            BroadcastMsgRequestBody::Topology(resp) => BroadcastMsgResponseBody::Topology(resp.into_reply(outbound_msg_id)),
+            BroadcastMsgRequestBody::Broadcast(resp) => BroadcastMsgResponseBody::Broadcast(resp.into_reply(outbound_msg_id)),
+            BroadcastMsgRequestBody::Read(resp) => BroadcastMsgResponseBody::Read(resp.into_reply(outbound_msg_id)),
+        }
     }
 }
 
 #[derive(Serialize, Debug)]
 #[serde(tag = "type")]
+#[serde(rename_all = "snake_case")]
 pub enum BroadcastMsgResponseBody {
-    Toplogy(TopologyResponseMsg),
+    Topology(TopologyResponseMsg),
     Broadcast(BroadcastResponseMsg),
     Read(ReadResponseMsg)
+}
+
+impl BroadcastMsgResponseBody {
+    pub fn set_value(&mut self, value: Option<Vec<Value>>) -> () {
+        match self {
+            BroadcastMsgResponseBody::Topology(_) => (),
+            BroadcastMsgResponseBody::Broadcast(_) => (),
+            BroadcastMsgResponseBody::Read(ref mut body) => body.messages = value.unwrap_or_default(),
+        }
+    }
+
 }
 
 impl rpc::Reply for BroadcastMsgResponseBody {}
@@ -89,24 +101,22 @@ pub enum MsgType {
 /// The only allowed values for our messages below
 /// are in these newtypes. These are not-public.
 #[derive(Deserialize, Debug)]
-struct Toplogy(MessageType);
+struct Topology(MessageType);
 
 /// Topology Request inbound
 #[derive(Deserialize, Debug)]
 pub struct TopologyRequestMsg {
-    #[serde(rename = "type")]
-    _typ: Toplogy,
-    msg_id: u64,
-    topology: HashMap<String, String>,
+    msg_id: Option<u64>,
+    pub topology: HashMap<String, Vec<String>>,
 }
 
 impl rpc::IntoReplyBody for TopologyRequestMsg {
     type Item = TopologyResponseMsg;
     fn into_reply(&self, outbound_msg_id: u64) -> TopologyResponseMsg {
         TopologyResponseMsg {
-            typ: ToplogyOk(MsgType::TopologyOk),
+            typ: TopologyOk(MsgType::TopologyOk),
             msg_id: outbound_msg_id,
-            in_reply_to: Some(self.msg_id),
+            in_reply_to: self.msg_id,
         }
     }
 }
@@ -114,12 +124,12 @@ impl rpc::IntoReplyBody for TopologyRequestMsg {
 
 /// Topology Request inbound
 #[derive(Serialize, Debug)]
-struct ToplogyOk(MsgType);
+struct TopologyOk(MsgType);
 
 #[derive(Serialize, Debug)]
 pub struct TopologyResponseMsg {
     #[serde(rename = "type")]
-    typ: ToplogyOk,
+    typ: TopologyOk,
     in_reply_to: Option<u64>,
     msg_id: u64,
 }
@@ -132,12 +142,9 @@ struct Broadcast(MessageType);
 
 #[derive(Deserialize, Debug)]
 pub struct BroadcastRequestMsg {
-    #[serde(rename = "type")]
-    _typ: Broadcast,
-    msg_id: u64,
-    message: Value,
+    msg_id: Option<u64>,
+    pub message: Value,
 }
-
 
 /// Broadcast Response
 #[derive(Serialize, Debug)]
@@ -158,7 +165,7 @@ impl rpc::IntoReplyBody for BroadcastRequestMsg {
         BroadcastResponseMsg {
             typ: BroadcastOk(MsgType::BroadcastOk),
             msg_id: outbound_msg_id,
-            in_reply_to: Some(self.msg_id),
+            in_reply_to: self.msg_id,
         }
     }
 }
@@ -172,9 +179,18 @@ struct Read(MessageType);
 
 #[derive(Deserialize, Debug)]
 pub struct ReadRequestMsg {
-    #[serde(rename = "type")]
-    _typ: Read,
-    msg_id: u64,
+    msg_id: Option<u64>,
+}
+impl rpc::IntoReplyBody for ReadRequestMsg {
+    type Item = ReadResponseMsg;
+    fn into_reply(&self, outbound_msg_id: u64) -> ReadResponseMsg {
+        ReadResponseMsg {
+            typ: ReadOk(MsgType::ReadOk),
+            msg_id: outbound_msg_id,
+            in_reply_to: self.msg_id,
+            messages: vec![]
+        }
+    }
 }
 
 /// Read Response
