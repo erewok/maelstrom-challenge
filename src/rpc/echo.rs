@@ -11,6 +11,7 @@ use super::IntoReplyBody;
 #[derive(Deserialize)]
 struct Echo(MessageType);
 
+/// Outbound message type strings
 #[derive(Serialize)]
 #[serde(rename_all = "snake_case")]
 enum EchoMsgResp {

@@ -5,7 +5,9 @@ use std::collections::HashMap;
 use crate::errors;
 use crate::rpc::{self, IntoReplyBody, MessageType};
 
-#[derive(Deserialize, Debug)]
+/// Our Broadcast node will *send* and *receive* these,
+/// so need to be able to serialize them too.
+#[derive(Serialize, Deserialize, Debug)]
 pub struct BroadcastMsgIn {
     pub src: String,
     pub dest: String,
@@ -43,7 +45,7 @@ impl BroadcastMsgIn {
     }
 }
 
-#[derive(Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug)]
 #[serde(tag = "type")]
 #[serde(rename_all = "snake_case")]
 pub enum BroadcastMsgRequestBody {
@@ -93,6 +95,7 @@ impl BroadcastMsgResponseBody {
 
 impl rpc::Reply for BroadcastMsgResponseBody {}
 
+/// Outbound message type strings
 #[derive(Serialize, Debug)]
 #[serde(rename_all = "snake_case")]
 pub enum MsgType {
@@ -107,7 +110,7 @@ pub enum MsgType {
 struct Topology(MessageType);
 
 /// Topology Request inbound
-#[derive(Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug)]
 pub struct TopologyRequestMsg {
     msg_id: Option<u64>,
     pub topology: HashMap<String, Vec<String>>,
@@ -139,10 +142,10 @@ pub struct TopologyResponseMsg {
 impl rpc::Reply for TopologyResponseMsg {}
 
 /// Broadcast Request inbound
-#[derive(Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug)]
 struct Broadcast(MessageType);
 
-#[derive(Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug)]
 pub struct BroadcastRequestMsg {
     msg_id: Option<u64>,
     pub message: Value,
@@ -174,10 +177,10 @@ impl rpc::IntoReplyBody for BroadcastRequestMsg {
 impl rpc::Reply for BroadcastResponseMsg {}
 
 /// Read Request inbound
-#[derive(Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug)]
 struct Read(MessageType);
 
-#[derive(Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug)]
 pub struct ReadRequestMsg {
     msg_id: Option<u64>,
 }

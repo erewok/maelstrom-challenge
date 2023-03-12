@@ -45,6 +45,7 @@ pub struct GenerateMsgOut {
     pub body: GenerateResponseMsg,
 }
 
+/// Outbound message type strings
 #[derive(Serialize, Debug)]
 #[serde(rename_all = "snake_case")]
 pub enum GenerateMsgType {
