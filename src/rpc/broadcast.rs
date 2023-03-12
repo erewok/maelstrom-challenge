@@ -20,14 +20,11 @@ pub struct BroadcastMsgOut {
 }
 
 impl BroadcastMsgIn {
-    pub fn into_response(
-        self,
-        value: &mut Option<Vec<Value>>,
-        outbound_msg_id: u64,
-    ) -> BroadcastMsgOut {
+    pub fn into_response(self, value: Option<Vec<Value>>, outbound_msg_id: u64) -> BroadcastMsgOut {
         let mut body = self.body.into_reply(outbound_msg_id);
-        if value.is_some() {
-            body.set_value(value.take());
+        let mut _value = value;
+        if _value.is_some() {
+            body.set_value(_value.take());
         }
         BroadcastMsgOut {
             src: self.dest,
@@ -38,7 +35,7 @@ impl BroadcastMsgIn {
 
     pub fn into_str_response(
         self,
-        value: &mut Option<Vec<Value>>,
+        value: Option<Vec<Value>>,
         outbound_msg_id: u64,
     ) -> Result<String, errors::ErrorMsg> {
         let msg_out = self.into_response(value, outbound_msg_id);

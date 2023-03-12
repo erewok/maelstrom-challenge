@@ -53,12 +53,12 @@ impl NodeHandler for Broadcast {
             eprintln!("{}", _e);
             errors::ErrorMsg::json_parse_error()
         })?;
-        let mut values = match &msg_in.body {
+        let values = match &msg_in.body {
             broadcast::BroadcastMsgRequestBody::Topology(msg) => self.handle_topology(msg),
             broadcast::BroadcastMsgRequestBody::Broadcast(msg) => self.handle_broadcast(msg),
             broadcast::BroadcastMsgRequestBody::Read(msg) => self.handle_read(msg),
         };
-        msg_in.into_str_response(&mut values, next_msg_id)
+        msg_in.into_str_response(values, next_msg_id)
     }
     async fn on_init(&mut self, msg: &rpc::InitMsgIn) -> Result<(), errors::ErrorMsg> {
         self.node_id = msg.body.node_id.clone();
