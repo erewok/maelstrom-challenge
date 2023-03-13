@@ -13,7 +13,7 @@ use crate::rpc::{self, broadcast};
 use crate::workload::Command;
 
 /// In lieu of *sending* messages: we print them to screen
-async fn send_messages(messages: Vec<rpc::broadcast::BroadcastMsgIn>) {
+fn send_messages(messages: Vec<rpc::broadcast::BroadcastMsgIn>) {
     messages
         .iter()
         .map(|m| {
@@ -29,8 +29,9 @@ async fn send_messages(messages: Vec<rpc::broadcast::BroadcastMsgIn>) {
 pub struct Broadcast {
     node_id: String,
     topology: HashMap<String, Vec<String>>,
+    all_nodes: HashSet<String>,
     // we will periodically broadcast messages to all other nodes
-    last_new_val: Option<u64>,
+    notify_vals: HashSet<u64>,
     // maelstrom broadcast values are unique and results do not need to be ordered
     values: HashSet<u64>,
     last_msg_id: u64,
@@ -38,8 +39,13 @@ pub struct Broadcast {
 }
 
 impl Broadcast {
-    async fn handle_tick(&self) -> Result<(), errors::ErrorMsg> {
-        self.build_broadcast_messages().map(send_messages);
+    async fn handle_tick(&mut self) -> Result<(), errors::ErrorMsg> {
+        let msgs = self.build_broadcast_messages();
+        if !msgs.is_empty() {
+            send_messages(msgs);
+        }
+        // race condition here?
+        self.notify_vals = HashSet::new();
         Ok(())
     }
 
@@ -48,9 +54,19 @@ impl Broadcast {
         msg: &broadcast::BroadcastRequestMsg,
     ) -> Option<HashSet<u64>> {
         if !self.values.contains(&msg.message) {
-            self.last_new_val = Some(msg.message);
+            self.values.insert(msg.message);
         }
-        self.values.insert(msg.message);
+        if !self.notify_vals.contains(&msg.message) {
+            self.notify_vals.insert(msg.message);
+        }
+        None
+    }
+
+    async fn handle_broadcast_ok(
+        &mut self,
+        msg: &broadcast::BroadcastReceivedOkMsg,
+    ) -> Option<HashSet<u64>> {
+        msg.in_reply_to.map(|k| self.notify_vals.remove(&k));
         None
     }
 
@@ -63,27 +79,32 @@ impl Broadcast {
         msg: &broadcast::TopologyRequestMsg,
     ) -> Option<HashSet<u64>> {
         self.topology = msg.topology.clone();
+        self.all_nodes = HashSet::new();
+        for node_list in msg.topology.values() {
+            for node in node_list {
+                self.all_nodes.insert(node.clone());
+            }
+        }
         None
     }
 
     /// Using a topology, we build a Vector of outbound messages
     /// All messages have same content for now.
-    fn build_broadcast_messages(&self) -> Option<Vec<rpc::broadcast::BroadcastMsgIn>> {
-        match (self.last_new_val, self.topology.get(self.node_id.as_str())) {
-            (Some(last_known_val), Some(nodes)) => Some(
-                nodes
-                    .iter()
-                    .map(|dest| {
-                        rpc::broadcast::BroadcastMsgIn::new_broadcast(
-                            self.node_id.clone(),
-                            dest.to_string(),
-                            last_known_val,
-                        )
-                    })
-                    .collect(),
-            ),
-            _ => None,
+    fn build_broadcast_messages(&mut self) -> Vec<rpc::broadcast::BroadcastMsgIn> {
+        let mut msgs = vec![];
+        for dest in self.all_nodes.iter() {
+            for msg in self.notify_vals.iter().map(|notify_val| {
+                rpc::broadcast::BroadcastMsgIn::new_broadcast(
+                    self.node_id.clone(),
+                    dest.to_string(),
+                    *notify_val,
+                    None,
+                )
+            }) {
+                msgs.push(msg);
+            }
         }
+        msgs
     }
 }
 
@@ -93,9 +114,10 @@ impl Node for Broadcast {
         Self {
             rx,
             last_msg_id: starting_msg_id,
-            last_new_val: None,
+            notify_vals: HashSet::new(),
             node_id: "n0".to_string(),
             topology: HashMap::new(),
+            all_nodes: HashSet::new(),
             values: HashSet::new(),
         }
     }
@@ -108,6 +130,9 @@ impl Node for Broadcast {
             broadcast::BroadcastMsgRequestBody::Topology(msg) => self.handle_topology(msg).await,
             broadcast::BroadcastMsgRequestBody::Broadcast(msg) => self.handle_broadcast(msg).await,
             broadcast::BroadcastMsgRequestBody::Read(msg) => self.handle_read(msg).await,
+            broadcast::BroadcastMsgRequestBody::BroadcastOk(msg) => {
+                self.handle_broadcast_ok(msg).await
+            }
         };
         let result = msg_in
             .into_str_response(values, self.last_msg_id)
@@ -118,6 +143,7 @@ impl Node for Broadcast {
         println!("{}", result);
         Ok(())
     }
+
     async fn on_init(&mut self, msg: rpc::InitMsgIn) -> Result<(), errors::ErrorMsg> {
         self.node_id = msg.body.node_id.clone();
         let msg_out = msg.into_response(self.last_msg_id);

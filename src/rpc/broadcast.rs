@@ -21,8 +21,13 @@ pub struct BroadcastMsgOut {
 }
 
 impl BroadcastMsgIn {
-    pub fn new_broadcast(src: String, dest: String, value: u64) -> BroadcastMsgIn {
-        let body = BroadcastMsgRequestBody::Broadcast(BroadcastRequestMsg::new(value));
+    pub fn new_broadcast(
+        src: String,
+        dest: String,
+        value: u64,
+        msg_id: Option<u64>,
+    ) -> BroadcastMsgIn {
+        let body = BroadcastMsgRequestBody::Broadcast(BroadcastRequestMsg::new(value, msg_id));
         BroadcastMsgIn { src, dest, body }
     }
 
@@ -30,16 +35,20 @@ impl BroadcastMsgIn {
         self,
         value: Option<HashSet<u64>>,
         outbound_msg_id: u64,
-    ) -> BroadcastMsgOut {
-        let mut body = self.body.into_reply(outbound_msg_id);
-        let mut _value = value;
-        if _value.is_some() {
-            body.set_value(_value.take());
-        }
-        BroadcastMsgOut {
-            src: self.dest,
-            dest: self.src,
-            body,
+    ) -> Option<BroadcastMsgOut> {
+        match self.body.into_reply(outbound_msg_id) {
+            BroadcastMsgResponseBody::NoOp => None,
+            mut body => {
+                let mut _value = value;
+                if _value.is_some() {
+                    body.set_value(_value.take());
+                }
+                Some(BroadcastMsgOut {
+                    src: self.dest,
+                    dest: self.src,
+                    body,
+                })
+            }
         }
     }
 
@@ -48,8 +57,12 @@ impl BroadcastMsgIn {
         value: Option<HashSet<u64>>,
         outbound_msg_id: u64,
     ) -> Result<String, errors::ErrorMsg> {
-        let msg_out = self.into_response(value, outbound_msg_id);
-        serde_json::to_string(&msg_out).map_err(errors::ErrorMsg::json_dumps_error)
+        match self.into_response(value, outbound_msg_id) {
+            None => Ok("".to_string()),
+            Some(msg_out) => {
+                serde_json::to_string(&msg_out).map_err(errors::ErrorMsg::json_dumps_error)
+            }
+        }
     }
 }
 
@@ -59,6 +72,7 @@ impl BroadcastMsgIn {
 pub enum BroadcastMsgRequestBody {
     Topology(TopologyRequestMsg),
     Broadcast(BroadcastRequestMsg),
+    BroadcastOk(BroadcastReceivedOkMsg),
     Read(ReadRequestMsg),
 }
 
@@ -76,17 +90,25 @@ impl rpc::IntoReplyBody for BroadcastMsgRequestBody {
             BroadcastMsgRequestBody::Read(resp) => {
                 BroadcastMsgResponseBody::Read(resp.into_reply(outbound_msg_id))
             }
+            BroadcastMsgRequestBody::BroadcastOk(_) => BroadcastMsgResponseBody::NoOp,
         }
     }
 }
 
-#[derive(Serialize, Debug)]
-#[serde(tag = "type")]
+#[derive(Serialize, Deserialize, Debug)]
+pub struct BroadcastReceivedOkMsg {
+    pub in_reply_to: Option<u64>,
+    msg_id: u64,
+}
+
+#[derive(Serialize, Deserialize, Debug)]
 #[serde(rename_all = "snake_case")]
+#[serde(untagged)]
 pub enum BroadcastMsgResponseBody {
     Topology(TopologyResponseMsg),
     Broadcast(BroadcastResponseMsg),
     Read(ReadResponseMsg),
+    NoOp,
 }
 
 impl BroadcastMsgResponseBody {
@@ -97,6 +119,7 @@ impl BroadcastMsgResponseBody {
             BroadcastMsgResponseBody::Read(ref mut body) => {
                 body.messages = value.unwrap_or_default()
             }
+            BroadcastMsgResponseBody::NoOp => (),
         }
     }
 }
@@ -104,7 +127,7 @@ impl BroadcastMsgResponseBody {
 impl rpc::Reply for BroadcastMsgResponseBody {}
 
 /// Outbound message type strings
-#[derive(Serialize, Debug)]
+#[derive(Serialize, Deserialize, Debug)]
 #[serde(rename_all = "snake_case")]
 pub enum MsgType {
     TopologyOk,
@@ -136,10 +159,10 @@ impl rpc::IntoReplyBody for TopologyRequestMsg {
 }
 
 /// Topology Request inbound
-#[derive(Serialize, Debug)]
+#[derive(Serialize, Deserialize, Debug)]
 struct TopologyOk(MsgType);
 
-#[derive(Serialize, Debug)]
+#[derive(Serialize, Deserialize, Debug)]
 pub struct TopologyResponseMsg {
     #[serde(rename = "type")]
     typ: TopologyOk,
@@ -160,19 +183,19 @@ pub struct BroadcastRequestMsg {
 }
 
 impl BroadcastRequestMsg {
-    pub fn new(message: u64) -> Self {
+    pub fn new(message: u64, msg_id: Option<u64>) -> Self {
         Self {
-            msg_id: None,
+            msg_id,
             message,
         }
     }
 }
 
 /// Broadcast Response
-#[derive(Serialize, Debug)]
+#[derive(Serialize, Deserialize, Debug)]
 struct BroadcastOk(MsgType);
 
-#[derive(Serialize, Debug)]
+#[derive(Serialize, Deserialize, Debug)]
 pub struct BroadcastResponseMsg {
     #[serde(rename = "type")]
     typ: BroadcastOk,
@@ -214,10 +237,10 @@ impl rpc::IntoReplyBody for ReadRequestMsg {
 }
 
 /// Read Response
-#[derive(Serialize, Debug)]
+#[derive(Serialize, Deserialize, Debug)]
 struct ReadOk(MsgType);
 
-#[derive(Serialize, Debug)]
+#[derive(Serialize, Deserialize, Debug)]
 pub struct ReadResponseMsg {
     #[serde(rename = "type")]
     typ: ReadOk,

@@ -1,6 +1,7 @@
 use async_trait::async_trait;
 use tokio::io::{self, AsyncBufReadExt, BufReader};
-use tokio::sync::mpsc::{self, Receiver};
+use tokio::sync::mpsc::{self, Receiver, Sender};
+use tokio::time::{self, Duration};
 
 use crate::algorithms;
 use crate::errors;
@@ -22,6 +23,14 @@ pub trait Node {
     // Nodes must be able to handle an init message but this won't be called directly
     // Init behavior is controlled by main thread via Command::Init sent down the channel
     async fn on_init(&mut self, msg: rpc::InitMsgIn) -> Result<(), errors::ErrorMsg>;
+}
+
+async fn run_clock(tx: Sender<workload::Command>) {
+    let mut interval = time::interval(Duration::from_millis(10));
+    loop {
+        interval.tick().await;
+        tx.send(workload::Command::Tick).await.unwrap();
+    }
 }
 
 pub async fn run(workload: workload::Workload) -> Result<(), errors::ErrorMsg> {
@@ -50,8 +59,14 @@ pub async fn run(workload: workload::Workload) -> Result<(), errors::ErrorMsg> {
     // Set up stdin listener loop
     let stdin = io::stdin();
     let mut lines = BufReader::new(stdin).lines();
-    // loop on stdin and send all messages down the channel
+
+    // Launch our node
     let _handle = tokio::spawn(async move { node.start().await });
+
+    // Launch our clock
+    let _tx = tx.clone();
+    tokio::spawn(async move { run_clock(_tx).await });
+    // loop on stdin and send all messages down the channel
     while let Some(line) = lines
         .next_line()
         .await

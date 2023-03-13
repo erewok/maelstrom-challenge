@@ -16,6 +16,7 @@ use crate::errors;
 pub enum MessageType {
     Init,
     Broadcast,
+    BroadcastOk,
     Topology,
     Read,
     Echo,
