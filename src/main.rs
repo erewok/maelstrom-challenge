@@ -16,5 +16,5 @@ struct Args {
 #[tokio::main]
 async fn main() {
     let args = Args::parse();
-    node::Node::run(args.workload).await.unwrap_err();
+    node::run(args.workload).await.unwrap_err();
 }

@@ -44,7 +44,8 @@ impl ErrorMsg {
         }
     }
 
-    pub fn json_parse_error() -> Self {
+    pub fn json_parse_error(err: impl std::error::Error) -> Self {
+        eprintln!("{:?}", err);
         ErrorMsg::new(
             None,
             ErrorType::MalformedRequest,
@@ -52,7 +53,8 @@ impl ErrorMsg {
         )
     }
 
-    pub fn json_dumps_error() -> Self {
+    pub fn json_dumps_error(err: impl std::error::Error) -> Self {
+        eprintln!("{:?}", err);
         ErrorMsg::new(
             None,
             ErrorType::MalformedRequest,
@@ -60,7 +62,8 @@ impl ErrorMsg {
         )
     }
 
-    pub fn crash_error() -> Self {
+    pub fn crash_error(err: impl std::error::Error) -> Self {
+        eprintln!("{:?}", err);
         ErrorMsg::new(None, ErrorType::Crash, "Unrecoverable error".to_string())
     }
 }

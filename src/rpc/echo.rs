@@ -43,8 +43,8 @@ impl EchoMsgIn {
     ) -> Result<String, errors::ErrorMsg> {
         let msg_out = serde_json::from_str::<Self>(msg)
             .map(|m| m.into_response(outbound_msg_id))
-            .map_err(|_e| errors::ErrorMsg::json_parse_error())?;
-        serde_json::to_string(&msg_out).map_err(|_e| errors::ErrorMsg::json_dumps_error())
+            .map_err(errors::ErrorMsg::json_parse_error)?;
+        serde_json::to_string(&msg_out).map_err(errors::ErrorMsg::json_dumps_error)
     }
 }
 

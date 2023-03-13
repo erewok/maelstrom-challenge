@@ -11,7 +11,7 @@ use crate::errors;
 /// These strings alone don't give much information
 /// because they're often repeated for different workloads
 /// see: https://github.com/jepsen-io/maelstrom/blob/main/doc/workloads.md
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Clone, Deserialize, Debug)]
 #[serde(rename_all = "snake_case")]
 pub enum MessageType {
     Init,
@@ -39,7 +39,7 @@ pub trait IntoReplyBody {
 
 ///
 
-#[derive(Deserialize, Debug)]
+#[derive(Clone, Debug, Deserialize)]
 pub struct InitMsgIn {
     pub src: String,
     pub dest: String,
@@ -61,8 +61,8 @@ impl InitMsgIn {
     ) -> Result<String, errors::ErrorMsg> {
         let msg_out = serde_json::from_str::<Self>(msg)
             .map(|m| m.into_response(outbound_msg_id))
-            .map_err(|_e| errors::ErrorMsg::json_parse_error())?;
-        serde_json::to_string(&msg_out).map_err(|_e| errors::ErrorMsg::json_dumps_error())
+            .map_err(errors::ErrorMsg::json_parse_error)?;
+        serde_json::to_string(&msg_out).map_err(errors::ErrorMsg::json_dumps_error)
     }
 }
 
@@ -73,7 +73,7 @@ pub struct InitMsgOut {
     pub body: InitResponseMsg,
 }
 
-#[derive(Deserialize, Debug)]
+#[derive(Clone, Deserialize, Debug)]
 struct Init(MessageType);
 
 #[derive(Serialize, Debug)]
@@ -85,7 +85,7 @@ enum InitMessageResp {
 #[derive(Serialize, Debug)]
 struct InitOk(InitMessageResp);
 
-#[derive(Deserialize, Debug)]
+#[derive(Clone, Deserialize, Debug)]
 pub struct InitRequestMsg {
     #[serde(rename = "type")]
     _typ: Init,

@@ -30,11 +30,8 @@ impl GenerateMsgIn {
                 msg_out.body.value = value;
                 msg_out
             })
-            .map_err(|_e| {
-                eprintln!("Failing to parse {:?}", _e);
-                errors::ErrorMsg::json_parse_error()
-            })?;
-        serde_json::to_string(&msg_out).map_err(|_e| errors::ErrorMsg::json_dumps_error())
+            .map_err(errors::ErrorMsg::json_parse_error)?;
+        serde_json::to_string(&msg_out).map_err(errors::ErrorMsg::json_dumps_error)
     }
 }
 

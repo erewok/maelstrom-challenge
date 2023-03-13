@@ -1,6 +1,5 @@
 use serde::{Deserialize, Serialize};
-use serde_json::Value;
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 
 use crate::errors;
 use crate::rpc::{self, IntoReplyBody, MessageType};
@@ -22,7 +21,16 @@ pub struct BroadcastMsgOut {
 }
 
 impl BroadcastMsgIn {
-    pub fn into_response(self, value: Option<Vec<Value>>, outbound_msg_id: u64) -> BroadcastMsgOut {
+    pub fn new_broadcast(src: String, dest: String, value: u64) -> BroadcastMsgIn {
+        let body = BroadcastMsgRequestBody::Broadcast(BroadcastRequestMsg::new(value));
+        BroadcastMsgIn { src, dest, body }
+    }
+
+    pub fn into_response(
+        self,
+        value: Option<HashSet<u64>>,
+        outbound_msg_id: u64,
+    ) -> BroadcastMsgOut {
         let mut body = self.body.into_reply(outbound_msg_id);
         let mut _value = value;
         if _value.is_some() {
@@ -37,11 +45,11 @@ impl BroadcastMsgIn {
 
     pub fn into_str_response(
         self,
-        value: Option<Vec<Value>>,
+        value: Option<HashSet<u64>>,
         outbound_msg_id: u64,
     ) -> Result<String, errors::ErrorMsg> {
         let msg_out = self.into_response(value, outbound_msg_id);
-        serde_json::to_string(&msg_out).map_err(|_e| errors::ErrorMsg::json_dumps_error())
+        serde_json::to_string(&msg_out).map_err(errors::ErrorMsg::json_dumps_error)
     }
 }
 
@@ -82,7 +90,7 @@ pub enum BroadcastMsgResponseBody {
 }
 
 impl BroadcastMsgResponseBody {
-    pub fn set_value(&mut self, value: Option<Vec<Value>>) {
+    pub fn set_value(&mut self, value: Option<HashSet<u64>>) {
         match self {
             BroadcastMsgResponseBody::Topology(_) => (),
             BroadcastMsgResponseBody::Broadcast(_) => (),
@@ -148,7 +156,16 @@ struct Broadcast(MessageType);
 #[derive(Serialize, Deserialize, Debug)]
 pub struct BroadcastRequestMsg {
     msg_id: Option<u64>,
-    pub message: Value,
+    pub message: u64,
+}
+
+impl BroadcastRequestMsg {
+    pub fn new(message: u64) -> Self {
+        Self {
+            msg_id: None,
+            message,
+        }
+    }
 }
 
 /// Broadcast Response
@@ -191,7 +208,7 @@ impl rpc::IntoReplyBody for ReadRequestMsg {
             typ: ReadOk(MsgType::ReadOk),
             msg_id: outbound_msg_id,
             in_reply_to: self.msg_id,
-            messages: vec![],
+            messages: HashSet::new(),
         }
     }
 }
@@ -206,7 +223,7 @@ pub struct ReadResponseMsg {
     typ: ReadOk,
     in_reply_to: Option<u64>,
     msg_id: u64,
-    messages: Vec<Value>,
+    messages: HashSet<u64>,
 }
 
 impl rpc::Reply for ReadResponseMsg {}

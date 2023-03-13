@@ -1,3 +1,6 @@
+use crate::rpc;
+use std::collections::HashMap;
+
 #[derive(clap::ValueEnum, Clone, Debug)]
 pub enum Workload {
     Broadcast,
@@ -10,4 +13,14 @@ pub enum Workload {
     TxnListAppend, // transactional workload over a map of keys to lists of elements
     TxnRwRegister, // transactional workload over a map of keys to values.
     UniqueIds,     // simple workload for ID generation systems
+}
+
+/// This enum represents internal messages
+#[derive(Clone, Debug)]
+pub enum Command {
+    Init(rpc::InitMsgIn),                  // Inbound init messages
+    Msg(String),                           // Inbound stdin messages
+    Toplogy(HashMap<String, Vec<String>>), // Toplogy changes
+    Shutdown,                              // Stop processing
+    Tick,                                  // Clock tick
 }

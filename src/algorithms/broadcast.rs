@@ -1,67 +1,144 @@
+/// Broadcast node: see maelstrom broadcast docs
 /// https://github.com/jepsen-io/maelstrom/blob/main/doc/03-broadcast/01-broadcast.md
 ///
 ///
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 
 use async_trait::async_trait;
-use serde_json::Value;
+use tokio::sync::mpsc::Receiver;
 
 use crate::errors;
-use crate::node::NodeHandler;
+use crate::node::Node;
 use crate::rpc::{self, broadcast};
+use crate::workload::Command;
 
-pub struct Broadcast {
-    pub node_id: String,
-    topology: HashMap<String, Vec<String>>,
-    values: Vec<Value>,
+/// In lieu of *sending* messages: we print them to screen
+async fn send_messages(messages: Vec<rpc::broadcast::BroadcastMsgIn>) {
+    messages
+        .iter()
+        .map(|m| {
+            let serialized = serde_json::to_string(&m).map_err(|_e| {
+                eprintln!("Serialization failed: {}", _e);
+            });
+            // simulate "send" by printing to screen
+            println!("{}", serialized.unwrap_or_default());
+        })
+        .reduce(|_a, _e| ());
 }
 
-impl Default for Broadcast {
-    fn default() -> Self {
-        Self::new()
-    }
+pub struct Broadcast {
+    node_id: String,
+    topology: HashMap<String, Vec<String>>,
+    // we will periodically broadcast messages to all other nodes
+    last_new_val: Option<u64>,
+    // maelstrom broadcast values are unique and results do not need to be ordered
+    values: HashSet<u64>,
+    last_msg_id: u64,
+    rx: Receiver<Command>,
 }
 
 impl Broadcast {
-    pub fn new() -> Self {
-        Self {
-            node_id: "n0".to_string(),
-            topology: HashMap::new(),
-            values: vec![],
-        }
+    async fn handle_tick(&self) -> Result<(), errors::ErrorMsg> {
+        self.build_broadcast_messages().map(send_messages);
+        Ok(())
     }
 
-    pub fn handle_broadcast(&mut self, msg: &broadcast::BroadcastRequestMsg) -> Option<Vec<Value>> {
-        self.values.push(msg.message.clone());
+    async fn handle_broadcast(
+        &mut self,
+        msg: &broadcast::BroadcastRequestMsg,
+    ) -> Option<HashSet<u64>> {
+        if !self.values.contains(&msg.message) {
+            self.last_new_val = Some(msg.message);
+        }
+        self.values.insert(msg.message);
         None
     }
 
-    pub fn handle_read(&mut self, _msg: &broadcast::ReadRequestMsg) -> Option<Vec<Value>> {
+    async fn handle_read(&mut self, _msg: &broadcast::ReadRequestMsg) -> Option<HashSet<u64>> {
         Some(self.values.clone())
     }
 
-    pub fn handle_topology(&mut self, msg: &broadcast::TopologyRequestMsg) -> Option<Vec<Value>> {
+    async fn handle_topology(
+        &mut self,
+        msg: &broadcast::TopologyRequestMsg,
+    ) -> Option<HashSet<u64>> {
         self.topology = msg.topology.clone();
         None
+    }
+
+    /// Using a topology, we build a Vector of outbound messages
+    /// All messages have same content for now.
+    fn build_broadcast_messages(&self) -> Option<Vec<rpc::broadcast::BroadcastMsgIn>> {
+        match (self.last_new_val, self.topology.get(self.node_id.as_str())) {
+            (Some(last_known_val), Some(nodes)) => Some(
+                nodes
+                    .iter()
+                    .map(|dest| {
+                        rpc::broadcast::BroadcastMsgIn::new_broadcast(
+                            self.node_id.clone(),
+                            dest.to_string(),
+                            last_known_val,
+                        )
+                    })
+                    .collect(),
+            ),
+            _ => None,
+        }
     }
 }
 
 #[async_trait]
-impl NodeHandler for Broadcast {
-    async fn handle(&mut self, msg: &str, next_msg_id: u64) -> Result<String, errors::ErrorMsg> {
-        let msg_in = serde_json::from_str::<broadcast::BroadcastMsgIn>(msg).map_err(|_e| {
-            eprintln!("{}", _e);
-            errors::ErrorMsg::json_parse_error()
-        })?;
-        let values = match &msg_in.body {
-            broadcast::BroadcastMsgRequestBody::Topology(msg) => self.handle_topology(msg),
-            broadcast::BroadcastMsgRequestBody::Broadcast(msg) => self.handle_broadcast(msg),
-            broadcast::BroadcastMsgRequestBody::Read(msg) => self.handle_read(msg),
-        };
-        msg_in.into_str_response(values, next_msg_id)
+impl Node for Broadcast {
+    fn new(starting_msg_id: u64, rx: Receiver<Command>) -> Self {
+        Self {
+            rx,
+            last_msg_id: starting_msg_id,
+            last_new_val: None,
+            node_id: "n0".to_string(),
+            topology: HashMap::new(),
+            values: HashSet::new(),
+        }
     }
-    async fn on_init(&mut self, msg: &rpc::InitMsgIn) -> Result<(), errors::ErrorMsg> {
+
+    async fn handle(&mut self, msg: String) -> Result<(), errors::ErrorMsg> {
+        self.last_msg_id += 1;
+        let msg_in = serde_json::from_str::<broadcast::BroadcastMsgIn>(msg.as_str())
+            .map_err(errors::ErrorMsg::json_parse_error)?;
+        let values = match &msg_in.body {
+            broadcast::BroadcastMsgRequestBody::Topology(msg) => self.handle_topology(msg).await,
+            broadcast::BroadcastMsgRequestBody::Broadcast(msg) => self.handle_broadcast(msg).await,
+            broadcast::BroadcastMsgRequestBody::Read(msg) => self.handle_read(msg).await,
+        };
+        let result = msg_in
+            .into_str_response(values, self.last_msg_id)
+            .map_err(|_e| {
+                eprintln!("{:?}", _e);
+                _e
+            })?;
+        println!("{}", result);
+        Ok(())
+    }
+    async fn on_init(&mut self, msg: rpc::InitMsgIn) -> Result<(), errors::ErrorMsg> {
         self.node_id = msg.body.node_id.clone();
+        let msg_out = msg.into_response(self.last_msg_id);
+        let result = serde_json::to_string(&msg_out).map_err(errors::ErrorMsg::json_dumps_error)?;
+        println!("{}", result);
+        Ok(())
+    }
+
+    async fn start(&mut self) -> Result<(), errors::ErrorMsg> {
+        while let Some(cmd) = self.rx.recv().await {
+            match cmd {
+                Command::Init(init_msg) => self.on_init(init_msg).await?,
+                Command::Msg(msg) => self.handle(msg).await?,
+                Command::Tick => self.handle_tick().await?,
+                Command::Toplogy(new_topology) => self.topology = new_topology,
+                Command::Shutdown => self.stop().await?,
+            }
+        }
+        Ok(())
+    }
+    async fn stop(&mut self) -> Result<(), errors::ErrorMsg> {
         Ok(())
     }
 }
