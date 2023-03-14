@@ -26,7 +26,7 @@ pub trait Node {
 }
 
 async fn run_clock(tx: Sender<workload::Command>) {
-    let mut interval = time::interval(Duration::from_millis(200));
+    let mut interval = time::interval(Duration::from_millis(150));
     loop {
         interval.tick().await;
         tx.send(workload::Command::Tick).await.unwrap();

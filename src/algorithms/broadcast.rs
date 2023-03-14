@@ -5,7 +5,7 @@
 use std::collections::{HashMap, HashSet};
 
 use async_trait::async_trait;
-use rand::seq::SliceRandom;
+use rand::{seq::IteratorRandom, thread_rng};
 use tokio::sync::mpsc::Receiver;
 
 use crate::errors;
@@ -91,8 +91,11 @@ impl Broadcast {
     /// Using a topology, we build a Vector of outbound messages
     /// All messages have same content for now.
     fn build_broadcast_messages(&mut self) -> Vec<rpc::broadcast::BroadcastMsgIn> {
+        let mut rng = thread_rng();
         let mut msgs = vec![];
-        if let Some(dest) = self.all_nodes.choose(&mut rand::thread_rng()) {
+        let sample_count = self.all_nodes.len() / 2 + 1;
+        let sample = self.all_nodes.iter().choose_multiple(&mut rng, sample_count);
+        for dest in sample {
             for msg in self.notify_vals.iter().map(|notify_val| {
                 rpc::broadcast::BroadcastMsgIn::new_broadcast(
                     self.node_id.clone(),
