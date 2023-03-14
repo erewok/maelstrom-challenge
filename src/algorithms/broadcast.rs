@@ -81,7 +81,7 @@ impl Broadcast {
         self.topology = msg.topology.clone();
         self.all_nodes = vec![];
         for node_list in msg.topology.values() {
-            for node in node_list.into_iter().filter(|nid| **nid != self.node_id) {
+            for node in node_list.iter().filter(|nid| **nid != self.node_id) {
                 self.all_nodes.push(node.clone());
             }
         }
@@ -144,7 +144,9 @@ impl Node for Broadcast {
                 eprintln!("{:?}", _e);
                 _e
             })?;
-        println!("{}", result);
+        if !result.is_empty() {
+            println!("{}", result);
+        }
         Ok(())
     }
 
