@@ -5,6 +5,7 @@
 use std::collections::{HashMap, HashSet};
 
 use async_trait::async_trait;
+use rand::seq::SliceRandom;
 use tokio::sync::mpsc::Receiver;
 
 use crate::errors;
@@ -29,9 +30,9 @@ fn send_messages(messages: Vec<rpc::broadcast::BroadcastMsgIn>) {
 pub struct Broadcast {
     node_id: String,
     topology: HashMap<String, Vec<String>>,
-    all_nodes: HashSet<String>,
+    all_nodes: Vec<String>,
     // we will periodically broadcast messages to all other nodes
-    notify_vals: HashSet<u64>,
+    notify_vals: Vec<u64>,
     // maelstrom broadcast values are unique and results do not need to be ordered
     values: HashSet<u64>,
     last_msg_id: u64,
@@ -45,7 +46,7 @@ impl Broadcast {
             send_messages(msgs);
         }
         // race condition here?
-        self.notify_vals = HashSet::new();
+        self.notify_vals = vec![];
         Ok(())
     }
 
@@ -57,16 +58,15 @@ impl Broadcast {
             self.values.insert(msg.message);
         }
         if !self.notify_vals.contains(&msg.message) {
-            self.notify_vals.insert(msg.message);
+            self.notify_vals.push(msg.message);
         }
         None
     }
 
     async fn handle_broadcast_ok(
         &mut self,
-        msg: &broadcast::BroadcastReceivedOkMsg,
+        _msg: &broadcast::BroadcastReceivedOkMsg,
     ) -> Option<HashSet<u64>> {
-        msg.in_reply_to.map(|k| self.notify_vals.remove(&k));
         None
     }
 
@@ -79,10 +79,10 @@ impl Broadcast {
         msg: &broadcast::TopologyRequestMsg,
     ) -> Option<HashSet<u64>> {
         self.topology = msg.topology.clone();
-        self.all_nodes = HashSet::new();
+        self.all_nodes = vec![];
         for node_list in msg.topology.values() {
-            for node in node_list {
-                self.all_nodes.insert(node.clone());
+            for node in node_list.into_iter().filter(|nid| **nid != self.node_id) {
+                self.all_nodes.push(node.clone());
             }
         }
         None
@@ -92,11 +92,11 @@ impl Broadcast {
     /// All messages have same content for now.
     fn build_broadcast_messages(&mut self) -> Vec<rpc::broadcast::BroadcastMsgIn> {
         let mut msgs = vec![];
-        for dest in self.all_nodes.iter() {
+        if let Some(dest) = self.all_nodes.choose(&mut rand::thread_rng()) {
             for msg in self.notify_vals.iter().map(|notify_val| {
                 rpc::broadcast::BroadcastMsgIn::new_broadcast(
                     self.node_id.clone(),
-                    dest.to_string(),
+                    dest.clone(),
                     *notify_val,
                     None,
                 )
@@ -104,6 +104,7 @@ impl Broadcast {
                 msgs.push(msg);
             }
         }
+
         msgs
     }
 }
@@ -114,10 +115,10 @@ impl Node for Broadcast {
         Self {
             rx,
             last_msg_id: starting_msg_id,
-            notify_vals: HashSet::new(),
+            notify_vals: vec![],
             node_id: "n0".to_string(),
             topology: HashMap::new(),
-            all_nodes: HashSet::new(),
+            all_nodes: vec![],
             values: HashSet::new(),
         }
     }

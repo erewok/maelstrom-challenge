@@ -184,10 +184,7 @@ pub struct BroadcastRequestMsg {
 
 impl BroadcastRequestMsg {
     pub fn new(message: u64, msg_id: Option<u64>) -> Self {
-        Self {
-            msg_id,
-            message,
-        }
+        Self { msg_id, message }
     }
 }
 

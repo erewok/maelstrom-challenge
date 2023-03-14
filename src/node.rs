@@ -26,7 +26,7 @@ pub trait Node {
 }
 
 async fn run_clock(tx: Sender<workload::Command>) {
-    let mut interval = time::interval(Duration::from_millis(10));
+    let mut interval = time::interval(Duration::from_millis(200));
     loop {
         interval.tick().await;
         tx.send(workload::Command::Tick).await.unwrap();
@@ -34,7 +34,7 @@ async fn run_clock(tx: Sender<workload::Command>) {
 }
 
 pub async fn run(workload: workload::Workload) -> Result<(), errors::ErrorMsg> {
-    let (tx, rx) = mpsc::channel(100);
+    let (tx, rx) = mpsc::channel(1000);
 
     let mut node = match workload {
         workload::Workload::Echo => {
