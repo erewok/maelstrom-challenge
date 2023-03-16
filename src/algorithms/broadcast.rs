@@ -56,8 +56,7 @@ impl Broadcast {
     ) -> Option<HashSet<u64>> {
         if !self.values.contains(&msg.message) {
             self.values.insert(msg.message);
-        }
-        if !self.notify_vals.contains(&msg.message) {
+            // we broadcast every novel thing we see (consider message amplification)
             self.notify_vals.push(msg.message);
         }
         None
