@@ -31,6 +31,7 @@ pub struct Broadcast {
     node_id: String,
     topology: HashMap<String, Vec<String>>,
     all_nodes: Vec<String>,
+    notify_ticks: u8,
     // we will periodically broadcast messages to all other nodes
     notify_vals: Vec<u64>,
     // maelstrom broadcast values are unique and results do not need to be ordered
@@ -41,12 +42,17 @@ pub struct Broadcast {
 
 impl Broadcast {
     async fn handle_tick(&mut self) -> Result<(), errors::ErrorMsg> {
+        // In order to get over network partitions, we'd need to try this
+        // more than once
+        self.notify_ticks += 1;
         let msgs = self.build_broadcast_messages();
         if !msgs.is_empty() {
             send_messages(msgs);
         }
         // race condition here?
-        self.notify_vals = vec![];
+        if self.notify_ticks > 40 {
+            self.notify_vals = vec![];
+        }
         Ok(())
     }
 
@@ -116,6 +122,7 @@ impl Node for Broadcast {
     fn new(starting_msg_id: u64, rx: Receiver<Command>) -> Self {
         Self {
             rx,
+            notify_ticks: 0,
             last_msg_id: starting_msg_id,
             notify_vals: vec![],
             node_id: "n0".to_string(),
