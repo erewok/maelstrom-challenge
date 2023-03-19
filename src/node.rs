@@ -46,7 +46,7 @@ pub async fn run(workload: workload::Workload) -> Result<(), errors::ErrorMsg> {
         workload::Workload::Broadcast => {
             Box::new(algorithms::broadcast::Broadcast::new(1, rx)) as Box<dyn Node + Send>
         }
-        workload::Workload::GCounter => todo!(),
+        workload::Workload::GCounter =>  Box::new(algorithms::gcounter::GCounter::new(1, rx)) as Box<dyn Node + Send>,
         workload::Workload::GSet => todo!(),
         workload::Workload::Kafka => todo!(),
         workload::Workload::LinKV => todo!(),

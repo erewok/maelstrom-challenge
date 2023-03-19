@@ -52,6 +52,7 @@ impl Broadcast {
         // race condition here?
         if self.notify_ticks > 40 {
             self.notify_vals = vec![];
+            self.notify_ticks = 0;
         }
         Ok(())
     }
