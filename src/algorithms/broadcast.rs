@@ -50,8 +50,8 @@ impl Broadcast {
             send_messages(msgs);
         }
         // race condition here?
-        if self.notify_ticks > 40 {
-            self.notify_vals = vec![];
+        if self.notify_ticks > 30 {
+            // self.notify_vals = vec![];
             self.notify_ticks = 0;
         }
         Ok(())

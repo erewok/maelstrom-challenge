@@ -5,9 +5,11 @@
 use std::collections::HashMap;
 
 use async_trait::async_trait;
+use serde_json::Value;
 use tokio::sync::mpsc::Receiver;
 
 use crate::errors;
+use crate::kv;
 use crate::node::Node;
 use crate::rpc::{self, gcounter};
 use crate::workload::Command;
@@ -27,6 +29,7 @@ fn send_messages(messages: Vec<gcounter::GCounterMessage>) {
 }
 
 pub struct GCounter {
+    kvstore: kv::KV,
     node_id: String,
     topology: HashMap<String, Vec<String>>,
     all_nodes: Vec<String>,
@@ -62,6 +65,7 @@ impl GCounter {
         val: u64,
     ) -> Option<u64> {
         self.internal_current += val;
+        self.kvstore.write(self.node_id.clone(), Value::Number(val.into()));
         None
     }
 
@@ -70,6 +74,7 @@ impl GCounter {
     }
 
     async fn handle_read(&mut self) -> Option<u64> {
+        // self.kvstore.read(self.node_id.clone());
         if self.internal_current > self.cluster_max {
             Some(self.internal_current)
         } else {
@@ -103,6 +108,7 @@ impl GCounter {
 impl Node for GCounter {
     fn new(_starting_msg_id: u64, rx: Receiver<Command>) -> Self {
         Self {
+            kvstore: kv::KV::new(kv::KvType::LinKV),
             rx,
             last_msg_id: 0,
             notify_ticks: 0,
