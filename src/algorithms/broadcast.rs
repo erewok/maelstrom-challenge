@@ -32,15 +32,16 @@ pub struct Broadcast {
     topology: HashMap<String, Vec<String>>,
     all_nodes: Vec<String>,
     notify_ticks: u8,
-    // we will periodically broadcast messages to all other nodes
-    notify_vals: Vec<u64>,
+    // peer versioning
+    peer_versions: HashMap<String, usize>,
     // maelstrom broadcast values are unique and results do not need to be ordered
-    values: HashSet<u64>,
+    values: Vec<u64>,
     last_msg_id: u64,
     rx: Receiver<Command>,
 }
 
 impl Broadcast {
+
     async fn handle_tick(&mut self) -> Result<(), errors::ErrorMsg> {
         // In order to get over network partitions, we'd need to try this
         // more than once
@@ -59,36 +60,70 @@ impl Broadcast {
 
     async fn handle_broadcast(
         &mut self,
+        source: &str,
         msg: &broadcast::BroadcastRequestMsg,
-    ) -> Option<HashSet<u64>> {
+    ) -> Option<Vec<u64>> {
+        // we can't blindly push them in anymore: we need to check source and msg_id
         if !self.values.contains(&msg.message) {
-            self.values.insert(msg.message);
-            // we broadcast every novel thing we see (consider message amplification)
-            self.notify_vals.push(msg.message);
+            self.values.push(msg.message);
         }
         None
     }
 
     async fn handle_broadcast_ok(
         &mut self,
+        source: &str,
         _msg: &broadcast::BroadcastReceivedOkMsg,
-    ) -> Option<HashSet<u64>> {
+    ) -> Option<Vec<u64>> {
+        // update peer_versions: in_reply_to should let you know message
+        match _msg.in_reply_to {
+            Some(_version) => {
+                let latest_peer_version = self.peer_versions.get(source).unwrap_or(&0);
+                let converted = _version as usize;
+                if &converted > latest_peer_version {
+                    self.peer_versions.insert(source.to_string(), converted);
+                }
+            }
+            None => ()
+        }
         None
     }
 
-    async fn handle_read(&mut self, _msg: &broadcast::ReadRequestMsg) -> Option<HashSet<u64>> {
+    async fn handle_read(&mut self, _msg: &broadcast::ReadRequestMsg) -> Option<Vec<u64>> {
         Some(self.values.clone())
     }
 
     async fn handle_topology(
         &mut self,
         msg: &broadcast::TopologyRequestMsg,
-    ) -> Option<HashSet<u64>> {
+    ) -> Option<Vec<u64>> {
         self.topology = msg.topology.clone();
         self.all_nodes = vec![];
+
+        let mut nodes_alive: HashSet<&str> = HashSet::new();
         for node_list in msg.topology.values() {
             for node in node_list.iter().filter(|nid| **nid != self.node_id) {
                 self.all_nodes.push(node.clone());
+                nodes_alive.insert(node);
+            }
+        }
+        let mut nodes_dead: HashSet<String> = HashSet::new();
+        if self.peer_versions.is_empty() {
+            self.peer_versions = self.all_nodes.iter().map(|nodeid| (nodeid.to_string(), 0)).collect();
+        } else {
+            for node in self.all_nodes.iter() {
+                if let None = self.peer_versions.get(node) {
+                    self.peer_versions.insert(node.to_string(), 0);
+                }
+            }
+            for node in self.peer_versions.keys() {
+                if !nodes_alive.contains(&*node.as_str()) {
+                    nodes_dead.insert(node.clone());
+                }
+            }
+
+            for node in nodes_dead {
+                self.peer_versions.remove(&node);
             }
         }
         None
@@ -102,15 +137,23 @@ impl Broadcast {
         let sample_count = self.all_nodes.len() / 2 + 1;
         let sample = self.all_nodes.iter().choose_multiple(&mut rng, sample_count);
         for dest in sample {
-            for msg in self.notify_vals.iter().map(|notify_val| {
-                rpc::broadcast::BroadcastMsgIn::new_broadcast(
-                    self.node_id.clone(),
-                    dest.clone(),
-                    *notify_val,
-                    None,
-                )
-            }) {
-                msgs.push(msg);
+            match self.peer_versions.get(dest) {
+                Some(version) => {
+                    if self.values.is_empty() {
+                        return vec![];
+                    }
+                    if version < &(self.values.len() - 1) {
+                        let notify_val = self.values[*version];
+                        let msg = rpc::broadcast::BroadcastMsgIn::new_broadcast(
+                            self.node_id.clone(),
+                            dest.clone(),
+                            notify_val,
+                            Some(*version as u64),
+                        );
+                        msgs.push(msg);
+                    }
+                },
+                None => ()
             }
         }
 
@@ -125,11 +168,11 @@ impl Node for Broadcast {
             rx,
             notify_ticks: 0,
             last_msg_id: starting_msg_id,
-            notify_vals: vec![],
+            peer_versions: HashMap::new(),
             node_id: "n0".to_string(),
             topology: HashMap::new(),
             all_nodes: vec![],
-            values: HashSet::new(),
+            values: vec![],
         }
     }
 
@@ -139,10 +182,10 @@ impl Node for Broadcast {
             .map_err(errors::ErrorMsg::json_parse_error)?;
         let values = match &msg_in.body {
             broadcast::BroadcastMsgRequestBody::Topology(msg) => self.handle_topology(msg).await,
-            broadcast::BroadcastMsgRequestBody::Broadcast(msg) => self.handle_broadcast(msg).await,
+            broadcast::BroadcastMsgRequestBody::Broadcast(msg) => self.handle_broadcast(&msg_in.src, msg).await,
             broadcast::BroadcastMsgRequestBody::Read(msg) => self.handle_read(msg).await,
             broadcast::BroadcastMsgRequestBody::BroadcastOk(msg) => {
-                self.handle_broadcast_ok(msg).await
+                self.handle_broadcast_ok(&msg_in.src, msg).await
             }
         };
         let result = msg_in

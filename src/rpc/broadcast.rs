@@ -33,13 +33,13 @@ impl BroadcastMsgIn {
 
     pub fn into_response(
         self,
-        value: Option<HashSet<u64>>,
+        values: Option<Vec<u64>>,
         outbound_msg_id: u64,
     ) -> Option<BroadcastMsgOut> {
         match self.body.into_reply(outbound_msg_id) {
             BroadcastMsgResponseBody::NoOp => None,
             mut body => {
-                let mut _value = value;
+                let mut _value = values;
                 if _value.is_some() {
                     body.set_value(_value.take());
                 }
@@ -54,10 +54,10 @@ impl BroadcastMsgIn {
 
     pub fn into_str_response(
         self,
-        value: Option<HashSet<u64>>,
+        values: Option<Vec<u64>>,
         outbound_msg_id: u64,
     ) -> Result<String, errors::ErrorMsg> {
-        match self.into_response(value, outbound_msg_id) {
+        match self.into_response(values, outbound_msg_id) {
             None => Ok("".to_string()),
             Some(msg_out) => {
                 serde_json::to_string(&msg_out).map_err(errors::ErrorMsg::json_dumps_error)
@@ -112,7 +112,7 @@ pub enum BroadcastMsgResponseBody {
 }
 
 impl BroadcastMsgResponseBody {
-    pub fn set_value(&mut self, value: Option<HashSet<u64>>) {
+    pub fn set_value(&mut self, value:Option<Vec<u64>>) {
         match self {
             BroadcastMsgResponseBody::Topology(_) => (),
             BroadcastMsgResponseBody::Broadcast(_) => (),
@@ -178,7 +178,7 @@ struct Broadcast(MessageType);
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct BroadcastRequestMsg {
-    msg_id: Option<u64>,
+    pub msg_id: Option<u64>,
     pub message: u64,
 }
 
@@ -228,7 +228,7 @@ impl rpc::IntoReplyBody for ReadRequestMsg {
             typ: ReadOk(MsgType::ReadOk),
             msg_id: outbound_msg_id,
             in_reply_to: self.msg_id,
-            messages: HashSet::new(),
+            messages: vec![],
         }
     }
 }
@@ -243,7 +243,7 @@ pub struct ReadResponseMsg {
     typ: ReadOk,
     in_reply_to: Option<u64>,
     msg_id: u64,
-    messages: HashSet<u64>,
+    messages: Vec<u64>,
 }
 
 impl rpc::Reply for ReadResponseMsg {}
